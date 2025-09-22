@@ -60,3 +60,15 @@ module.exports.loginUser = (req, res) => {
     }
 };
 
+
+module.exports.getUserDetails = (req, res) => {
+    return User.findById(req.user.id)
+        .then(user => {
+            if (!user) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            user.password = undefined; // don’t expose password
+            return res.status(200).send({ user });
+        })
+        .catch(error => errorHandler(error, req, res));
+};

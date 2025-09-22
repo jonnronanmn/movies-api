@@ -9,6 +9,6 @@ router.post("/register", userController.registerUser);
 // User login
 router.post("/login", userController.loginUser);
 
-// You can add more routes later, e.g. get profile, update password, etc.
+router.get("/details", verify, userController.getUserDetails);
 
 module.exports = router;
