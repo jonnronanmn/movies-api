@@ -66,11 +66,18 @@ module.exports.updateMovie = async (req, res) => {
 };
 
 // Delete a movie (Admin only)
+const mongoose = require('mongoose');
+
 module.exports.deleteMovie = async (req, res) => {
   const { movieId } = req.params;
 
   if (!movieId) {
     return res.status(400).send({ error: 'Movie ID is required' });
+  }
+
+  // Check if it's a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(movieId)) {
+    return res.status(400).send({ error: 'Invalid movie ID' });
   }
 
   try {
@@ -83,12 +90,6 @@ module.exports.deleteMovie = async (req, res) => {
     return res.status(200).send({ message: 'Movie deleted successfully' });
   } catch (err) {
     console.error('Error in deleting a movie:', err);
-
-    // Handle invalid ObjectId specifically
-    if (err.name === 'CastError' && err.kind === 'ObjectId') {
-      return res.status(400).send({ error: 'Invalid movie ID' });
-    }
-
     return res.status(500).send({ error: 'Internal server error while deleting movie' });
   }
 };
