@@ -66,21 +66,31 @@ module.exports.updateMovie = async (req, res) => {
 };
 
 // Delete a movie (Admin only)
-module.exports.deleteMovie = (req, res) => {
+module.exports.deleteMovie = async (req, res) => {
+  const { movieId } = req.params;
 
-    return Movies.findByIdAndDelete(req.params.movieId)
-    .then(deletedMovie => {
-        if (!deletedMovie) {
-            return res.status(404).send({ error: 'Movie not deleted' });
-        }
+  if (!movieId) {
+    return res.status(400).send({ error: 'Movie ID is required' });
+  }
 
-        return res.status(200).send({message: 'Movie deleted successfully'});
+  try {
+    const deletedMovie = await Movies.findByIdAndDelete(movieId);
 
-    })
-    .catch(err => {
-    console.error("Error in deleting a movie: ", err)
-    return res.status(500).send({ error: 'Error in deleting a movie.' });
-  });
+    if (!deletedMovie) {
+      return res.status(404).send({ error: 'Movie not found or already deleted' });
+    }
+
+    return res.status(200).send({ message: 'Movie deleted successfully' });
+  } catch (err) {
+    console.error('Error in deleting a movie:', err);
+
+    // Handle invalid ObjectId specifically
+    if (err.name === 'CastError' && err.kind === 'ObjectId') {
+      return res.status(400).send({ error: 'Invalid movie ID' });
+    }
+
+    return res.status(500).send({ error: 'Internal server error while deleting movie' });
+  }
 };
 
 // Add a comment to a movie (Authenticated users)
