@@ -88,7 +88,7 @@ module.exports.addComment = async (req, res) => {
   try {
     const { comment } = req.body;
     const { movieId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.id; // From verify middleware
 
     if (!comment || comment.trim() === "") {
       return res.status(400).send({ message: 'Comment cannot be empty' });
@@ -101,7 +101,9 @@ module.exports.addComment = async (req, res) => {
     movie.comments.push(newComment);
     await movie.save();
 
-    res.status(200).send({ message: 'Comment added', comment: newComment });
+    // Return the updated movie so frontend can update state directly
+    const populatedMovie = await movie.populate('comments.userId', 'email isAdmin');
+    res.status(200).send({ message: 'Comment added successfully', movie: populatedMovie });
   } catch (error) {
     errorHandler(error, req, res);
   }
