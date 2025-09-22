@@ -1,74 +1,67 @@
-const User = require('../models/User');
-const bcrypt = require('bcrypt');
-const { errorHandler } = require('../errorHandler');3
-const auth = require('../auth'); 
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-module.exports.registerUser = (req, res) => {
+const JWT_SECRET = process.env.JWT_SECRET_KEY;
 
-    // Checks if the email is in the right format
-    if (!req.body.email.includes("@")){
-        // if the email is not in the right format, send a message 'Invalid email format'.
-        return res.status(400).send({ message: 'Invalid email format' });
-    }
-    // Checks if the password has atleast 8 characters
-    else if (req.body.password.length < 8) {
-        // If the password is not atleast 8 characters, send a message 'Password must be atleast 8 characters long'.
-        return res.status(400).send({ message: 'Password must be atleast 8 characters long' });
-    // If all needed requirements are achieved
-    } else {
-        let newUser = new User({
-            email : req.body.email,
-            password : bcrypt.hashSync(req.body.password, 10)
-        })
+// Register
+exports.registerUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-        return newUser.save()
-        // if all needed requirements are achieved, send a success message 'User registered successfully' and return the newly created user.
-        .then((result) => res.status(201).send({
-            message: 'Registered successfully'
-        }))
-        .catch(error => errorHandler(error, req, res));
-    }
+    if (!email || !password)
+      return res.status(400).send({ message: "Email and password are required" });
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).send({ message: "Email already registered" });
+
+    if (password.length < 8)
+      return res.status(400).send({ message: "Password must be atleast 8 characters long" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({ email, password: hashedPassword });
+    await newUser.save();
+
+    res.status(201).send({ message: "Registered successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Server error" });
+  }
 };
 
+// Login
+exports.loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).send({ error: "No Email Found" });
 
-module.exports.loginUser = (req, res) => {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).send({ error: "Invalid password" });
 
-    if(req.body.email.includes("@")){
-        return User.findOne({ email : req.body.email })
-        .then(result => {
-            if(result == null){
-                // if the email is not found, send a message 'No email found'.
-                return res.status(404).send({ message: 'No email found' });
-            } else {
-                const isPasswordCorrect = bcrypt.compareSync(req.body.password, result.password);
-                if (isPasswordCorrect) {
-                    // if all needed requirements are achieved, send a success message 'User logged in successfully' and return the access token.
-                    return res.status(200).send({ 
-                        access : auth.createAccessToken(result)
-                        })
-                } else {
-                    // if the email and password is incorrect, send a message 'Incorrect email or password'.
-                    return res.status(401).send({ message: 'Incorrect email or password' });
-                }
-            }
-        })
-        .catch(error => errorHandler(error, req, res));
-    } else{
-        // if the email used in not in the right format, send a message 'Invalid email format'.
-        return res.status(400).send({ message: 'Invalid email format' });
-    }
+    const token = jwt.sign({ id: user._id, isAdmin: user.isAdmin }, JWT_SECRET, { expiresIn: "1d" });
+
+    res.status(200).send({ access: token }); // ✅ send 'access' token
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Server error" });
+  }
 };
 
+// Get user details
+exports.getUserDetails = async (req, res) => {
+  try {
+    const userId = req.user.id; // from verify middleware
+    const user = await User.findById(userId).select("_id email isAdmin");
 
-module.exports.getUserDetails = (req, res) => {
-    return User.findById(req.user.id)
-        .then(user => {
-            if (!user) {
-                return res.status(404).send({ message: "User not found" });
-            }
-            user.password = undefined; // don’t expose password
-            return res.status(200).send({ user });
-        })
-        .catch(error => errorHandler(error, req, res));
+    if (!user) return res.status(404).send({ error: "User not found" });
+
+    res.status(200).send({ user }); // ✅ send user object
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Server error" });
+  }
 };
